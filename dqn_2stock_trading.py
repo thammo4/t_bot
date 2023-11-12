@@ -13,11 +13,10 @@ from tensorflow.keras.optimizers import Adam;
 # Define relevant constants
 #
 
-# EPISODE_COUNT = 3750; # 7500;
-# DAYS_PER_EPISODE = 75;
-EPISODE_COUNT = 100;
-DAYS_PER_EPISODE = 10;
-ACCT_BAL_0 = 1000;
+EPISODE_COUNT 		= 100;
+DAYS_PER_EPISODE 	= 10;
+
+ACCT_BAL_0 			= 1000;
 
 SHARES_PER_TRADE = 10;
 
@@ -38,8 +37,6 @@ GAMMA = .950;
 # Define state-space/action-space size
 #
 
-# state_count_A, state_count_B = 750, 750;
-# state_count_A, state_count_B = 375, 375;
 state_count_A, state_count_B = 10, 10;
 action_countA, action_count_B = 3, 3;
 
@@ -49,16 +46,39 @@ action_countA, action_count_B = 3, 3;
 # Stock XYZ
 #
 
+# def closing_price_A (theta):
+# 	return 12*np.sin(.3*theta) + 25;
 def closing_price_A (theta):
-	return 12*np.sin(.3*theta) + 25;
+	noise = 0;
+	random_value = np.random.rand();
+	if random_value <= .250:
+		noise = 2*np.random.standard_t(1,1)[0];
+	elif random_value > .250 and random_value <= .750:
+		noise = np.random.standard_cauchy(1)[0];
+	elif random_value > .750:
+		noise = np.random.gamma(4.25,1,1)[0];
+	if np.abs(noise) > 25:
+		noise *= .250;
+	return (12*np.sin(.3*theta)+25) + noise;
+
 
 
 #
 # Simulate daily closing price by evaluating f(theta) = 25cos(.5*theta) + 35 for specified theta (e.g day)
 #
 
+# def closing_price_B (theta):
+# 	return 25*np.cos(.5*theta) + 35;
 def closing_price_B (theta):
-	return 25*np.cos(.5*theta) + 35;
+	noise = 0;
+	random_value = np.random.rand();
+	if random_value <= .50:
+		noise = np.random.poisson(8,1)[0];
+	else:
+		noise = np.random.rayleigh(5);
+	if np.random.rand() <= .725:
+		noise *= -1;
+	return (25*np.cos(.5*theta)+35) + noise;
 
 
 #
@@ -238,18 +258,11 @@ for ep in range(EPISODE_COUNT):
 			break;
 
 
-
-
 		#
 		# Update Q-table per Q-learning update rule
 		#
 
-		# print('update entry for (state_A, state_B, action) = (', state_A, ', ', state_B, ', ', action_index, ') -> ', np.max(Q[next_state_A, next_state_B, :]));
-
-		# Q[state_A, state_B, action_index] += ALPHA * (reward + GAMMA * np.max(Q[next_state_A, next_state_B, :]) - Q[state_A, state_B, action_index]);
-
 		state_A, state_B = next_state_A, next_state_B;
-		# print('Q\n', Q);
 		print('Q VALUES\n', q_vals);
 
 		print('-------------');
