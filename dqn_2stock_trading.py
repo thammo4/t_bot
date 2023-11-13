@@ -13,8 +13,10 @@ from tensorflow.keras.optimizers import Adam;
 # Define relevant constants
 #
 
-EPISODE_COUNT 		= 100;
-DAYS_PER_EPISODE 	= 10;
+# EPISODE_COUNT 		= 100;
+# DAYS_PER_EPISODE 	= 10;
+EPISODE_COUNT = 150;
+DAYS_PER_EPISODE = 15;
 
 ACCT_BAL_0 			= 1000;
 
@@ -28,16 +30,17 @@ ACTIONS = [(a,b) for a in actions for b in actions];
 # Define greek hyperparameters: random action rate, learn rate, discount rate
 #
 
-EPSILON = .125;
-ALPHA = .20;
-GAMMA = .950;
+EPSILON = .10;
+ALPHA = .1250;
+GAMMA = .9750;
 
 
 #
 # Define state-space/action-space size
 #
 
-state_count_A, state_count_B = 10, 10;
+# state_count_A, state_count_B = 10, 10;
+state_count_A, state_count_B = 15, 15;
 action_countA, action_count_B = 3, 3;
 
 
@@ -58,7 +61,7 @@ def closing_price_A (theta):
 	elif random_value > .750:
 		noise = np.random.gamma(4.25,1,1)[0];
 	if np.abs(noise) > 25:
-		noise *= .250;
+		noise *= .1250;
 	return (12*np.sin(.3*theta)+25) + noise;
 
 
@@ -78,6 +81,9 @@ def closing_price_B (theta):
 		noise = np.random.rayleigh(5);
 	if np.random.rand() <= .725:
 		noise *= -1;
+
+	if np.abs(noise) > 15:
+		noise *= .250;
 	return (25*np.cos(.5*theta)+35) + noise;
 
 
@@ -160,6 +166,12 @@ def execute_action (state_A, state_B, action_idx, shares_A, shares_B, bal):
 	#
 
 	reward = next_acct_value - ACCT_BAL_0;
+
+	if action_A == 'sell' and action_B == 'sell':
+		reward *= 1.05;
+
+	if action_A == 'hold' and action_B == 'hold':
+		reward *= .975;
 
 	return {
 		'next_state_A' 	: next_state_A,
