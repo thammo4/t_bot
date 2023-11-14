@@ -12,7 +12,14 @@ from datetime import datetime, timedelta;
 import yfinance as yf;
 from fredapi import Fred;
 
-from uvatradier import Tradier, Account, EquityOrder; # tradier will be used to execute trades
+# Execute paper trade orders on Tradier brokerage platform
+# https://pypi.org/project/uvatradier/
+from uvatradier import Tradier, Account, EquityOrder;
+
+# Packages to implement neural network that approximates action-value function
+from tensorflow.keras.models import Sequential;
+from tensorflow.keras.layers import Dense;
+from tensorflow.keras.optimizers import Adam;
 
 
 #
@@ -45,10 +52,47 @@ tradier_token = os.getenv('tradier_token');
 
 
 #
-# Instantiate FRED and Tradier Objects
+# Instantiate FRED
 #
 
 fred = Fred(api_key = fred_api_key);
+
+
+#
+# Instantiate Tradier
+#
+
+# >>> uva_account.get_account_balance().T
+# option_short_value                   0
+# total_equity                 262571.53
+# account_number              VA36593574
+# account_type                    margin
+# close_pl                             0
+# current_requirement            16214.1
+# equity                               0
+# long_market_value              32110.2
+# market_value                   32110.2
+# open_pl                       -6755.37
+# option_long_value                    0
+# option_requirement                   0
+# pending_orders_count                 0
+# short_market_value                   0
+# stock_long_value               32110.2
+# total_cash                   230461.33
+# uncleared_funds                      0
+# pending_cash                         0
+# margin.fed_call                      0
+# margin.maintenance_call              0
+# margin.option_buying_power    246652.8
+# margin.stock_buying_power     493305.6
+# margin.stock_short_value             0
+# margin.sweep                         0
+
+# >>> uva_equity_order.order(symbol='DD', side='buy', quantity=5, order_type='market')
+# {'order': {'id': 9163724, 'status': 'ok', 'partner_id': '3a8bbee1-5184-4ffe-8a0c-294fbad1aee9'}}
+
+uva_account = Account(tradier_acct, tradier_token);
+uva_equity_order = EquityOrder(tradier_acct, tradier_token);
 
 
 
@@ -107,6 +151,10 @@ stock_data = pd.DataFrame({
 });
 
 
+
+
+
+
 #
 # Supervised Learning Feature Mining for Augmented State Space Representation
 # 	I. SVM-Volatility
@@ -116,9 +164,12 @@ stock_data = pd.DataFrame({
 #
 
 
-#
-# A. Build SVM-based Volatility Model
-#
+
+#######################################
+# A. Build SVM-based Volatility Model #
+#######################################
+
+
 
 # 1. fetch volatility data from FRED
 
@@ -156,11 +207,6 @@ volatility_data = pd.DataFrame({
 
 volatility_data = volatility_data[volatility_data.index >= pd.to_datetime('2008-06-03')];
 
-
-
-
-
-
 # 2. For each column in stock_data, construct a SVM-vix model:
 # 	• Create a new dataframe with one column for a single stock's daily closing price and the other columns filled with volatility data
 # 	• Convert closing price -> daily price change
@@ -182,9 +228,11 @@ volatility_data = volatility_data[volatility_data.index >= pd.to_datetime('2008-
 
 
 
-#
-# B. Build Cluster-Based Market Regime Detection Model
-#
+
+########################################################
+# B. Build Cluster-Based Market Regime Detection Model #
+########################################################
+
 
 # 1. Get a bunch of data sets that heuristically reflect market conditions
 # 	• Examples:
@@ -206,9 +254,12 @@ volatility_data = volatility_data[volatility_data.index >= pd.to_datetime('2008-
 
 
 
-#
-# C. Construct RIDGE Regression Model To Predict Future Stock Prices (`predict_stock_return`)
-#
+
+
+###############################################################################################
+# C. Construct RIDGE Regression Model To Predict Future Stock Prices (`predict_stock_return`) #
+###############################################################################################
+
 
 # 1. Get a bunch of data series that might be useful for predicting a blue-chip stock's daily closing price.
 # 	• Examples:
@@ -218,6 +269,16 @@ volatility_data = volatility_data[volatility_data.index >= pd.to_datetime('2008-
 # 		• Govt: 	Yield Curve
 # 		• Housing: 	New Homes Built (HOUST), New Building Permits Issued (PERMIT), New Home Sales (HSN1F)
 # 		• Fed: 		Federal Funds Rate (FEDFUNDS), Discount/Primary Credit Rate (DISCOUNT), Reserve Balances with Federal Reserve Banks (WRESBAL), Federal Reserve Total Assets (WALCL), Federal Funds Rate Monthly (FEDFUNDSM)
+
+
+# TO DO: ENSURE THAT EACH OF THE BELOW FRED DATAFRAMES CONTAIN DAILY DATA (e.g. not weekly/monthly/quarterly)
+# 	• Fill in the inter-observation missing daily days values with preceding observation's value (simple but whatever)
+
+overall_market_ids = ['DJIA', 'DJTA', 'WILL5000IND']; 								# DJIA, DJTA start 2013-11-14
+macro_economic_ids = ['GDP', 'UMCSENT', 'CPIAUCSL', 'PPIACO', 'UNRATE', 'RSXFS']; 	# RSXFS starts 1992; need to adjust because some monthly basis, some quarterly basis.
+federal_reserve_ids = ['FEDFUNDS', 'WALCL', 'WRESBAL']; 							# WALCL starts 2002-12-18; freqs = [monthly, weekly, weekly]
+
+
 
 
 # 2. Organize all of the data series into a sensible data frame -> partition the buncha-datasets into training and testing samples
@@ -236,6 +297,16 @@ volatility_data = volatility_data[volatility_data.index >= pd.to_datetime('2008-
 
 
 
+#
+# Define RL State Space Representation
+#
+
+class State:
+	def __init__ (self, portfolio, acct_bal, market_data, economic_indicators):
+		self.portfolio = portfolio;
+		self.acct_bal = acct_bal;
+		self.market_data = market_data;
+		self.economic_indicators = economic_indicators
 
 
 
@@ -248,119 +319,136 @@ MIN_BAL_TO_TRADE 		= stock_data.min().min(); # we buy until we can't!
 
 actions = ('hold', 'buy', 'sell');
 
-# def get_action (acct_bal, stock_prices, portfolio, wager_frac):
-# 	actions = [];
-
-# 	action = ('hold', 0);
-
-# 	for stock in stock_basket:
-# 		price = stock_prices[stock];
-# 		if should_buy(acct_bal, stock, portfolio):
-# 			num_shares = int((acct_bal*wager_frac) / price);
-# 			action = ('buy', num_shares);
-# 		elif should_sell(stock, portfolio):
-# 			num_shares = calculate_shares_to_sell(portfolio, stock);
-# 			action = ('sell', num_shares);
-
-# 		actions.append(action);
-
-# 	return actions;
+def execute_action (state, action, stock, kelly_frac):
+	if action == 'buy':
+		# Retrieve estimated probability of "win" (e.g. that the stock's price will increase)
+		# Retrieve expected return from RIDGE regression model.
+		# 	• RIDGE model will produce a predicted future price of the stock.
+		# 	• Using the price at which we bought the stock and the RIDGE-predicted future price, we can compute the expected return.
+		expected_return, win_prob = predict_stock_return(stock, state.market_data);
+		num_shares = calculate_shares_to_buy(state.acct_bal, stock, expected_return, win_prob, kelly_frac);
+		buy_stock(state, stock, num_shares);
+	elif action == 'sell':
+		num_shares = calculate_shares_to_sell(state.portfolio, stock, kelly_frac);
+		sell_stock(state, stock, num_shares);
 
 
+def kelly_wager (prob_win, prob_loss, loss_frac, win_frac):
+	return (prob_win / loss_frac) - (prob_loss / win_frac);
 
-
-
-
-
-
-
-
-
-
-def get_action (acct_bal, stock_prices, portfolio, estimated_edge, win_prob):
-	actions = [];
-
-	action = ('hold', 0);
-	for stock in stock_basket:
-		price = stock_prices[stock];
-		trade_fraction = kelly_wager(estimated_edge, win_prob);
-		if should_buy (acct_bal, stock, portfolio):
-			num_shares = int((acct_bal*trade_fraction) / price);
-			action = ('buy', num_shares);
-		elif should_sell(stock, portfolio):
-			num_shares = calculate_shares_to_sell(portfolio, stock);
-			action = ('sell', num_shares);
-
-		actions.append(action);
-
-	return actions;
-
-
-def kelly_wager (edge, prob):
-	loss_prob = 1 - prob;
-	return (estimated_edge*prob - loss_prob) / estimated_edge;
-
-
-
-def should_buy (acct_bal, stock, portfolio, stock_prices, threshold):
-	is_good_buy = False;
-
-	expected_return = predict_stock_return(stock, stock_prices);
-
-	if expected_return > threshold and acct_bal > MIN_BAL_TO_TRADE:
-		is_good_buy = True;
-
-	return is_good_buy;
 
 def predict_stock_return (stock, stock_prices):
 	# PUT A PREDICTIVE MODEL OF STOCK PRICES HERE
 	return .05;
 
 
-def should_sell (stock, portfolio):
-	'''This function should implement stock selling logic based upon trends, time held, price, etc...'''
-	print('hello, should_sell!');
+def calculate_shares_to_buy (acct_bal, stock_price, expected_return, win_prob):
+	kelly_frac = win_prob * expected_return - (1-win_prob);
+
+	if kelly_frac < 0 or kelly_frac > 1:
+		return 0;
+
+	num_shares = int((kelly_frac*acct_bal) / stock_price);
+
+	return min(num_shares, MAX_SHARES_PER_STOCK);
+
 
 def calculate_shares_to_sell (portfolio, stock):
-	'''This function should determine the number of owned shares with which to part'''
-	print('hello, calculate_shares_to_sell!');
-
-
-
+	'''This function will determine the appropriate number of shares to sell of `stock`'''
+	num_shares_held = portfolio[stock];
+	return num_shares_held;
 
 
 
 #
-# RIDGE Regression Example (for temporary reference during development)
-# 	• NB: for python, `alpha` is the ordinary lambda tuning parameter
+# Define Feed-Forward Artificial Neural Network containing a single hidden layer with nonlinear activation functions.
 #
 
-df = pd.read_csv("https://raw.githubusercontent.com/Statology/Python-Guides/main/mtcars.csv")[['mpg', 'wt', 'drat', 'qsec', 'hp']];
 
-# Define covariates (X) and response (Y)
-# For stock trading:
-# 	• df_X = Factors that contribute to / affect the closing price of a stock
-# 	• df_Y = Closing price of a stock
-df_X = df[['mpg', 'wt', 'drat', 'qsec']];
-df_Y = df['hp'];
+#
+# Define neural network I/O dimensions
+#
 
-# Perform 10-fold cross validation three times
-# For stock trading:
-# 	• This can probably stay the same
-xval = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1);
+# ann_input_size = state_count_A + state_count_B;
+# ann_output_size = len(ACTIONS);
 
-# Define model and fit to training data
-# For stock trading:
-# 	• This can probably stay the same
-model = RidgeCV(alphas=np.arange(.01, 1, .01), cv=xval, scoring='neg_mean_absolute_error');
-model.fit(df_X, df_Y);
+# q_network = q_ann(ann_input_size, ann_output_size);
 
-print('Tuning parameter (lambda) corresponding to lowest test MSE: {}'.format(model.alpha_));
 
-# Prediction with RIDGE Model
-# For stock trading:
-# 	• Update the df_new to contain the future values of the covariates from df_X
-df_new = pd.DataFrame({'mpg':[24], 'wt':[2.5], 'drat':[3.5], 'qsec':[18.5]});
-df_predicted = model.predict(df_new);
 
-print(f'Predicted HP: {df_predicted[0]}');
+#
+# Train RL Agent
+#
+
+for ep in range(EPISODE_COUNT):
+	# state_A = ep * DAYS_PER_EPISODE % state_count_A;
+	# state_B = ep * DAYS_PER_EPISODE % state_count_B;
+
+	# acct_bal = ACCT_BAL_0;
+
+	# shares_held_A = 0;
+	# shares_held_B = 0;
+
+	for day in range(DAYS_PER_EPISODE):
+
+		#
+		# Represent state with one-hot encoded value
+		#
+
+		# state = one_hot_states(state_A, state_B);
+
+		#
+		# Choose action per epsilon-greedy policy
+		#
+
+		# action_index = choose_action(state_A, state_B, q_network);
+
+		# action_outcome = execute_action(state_A, state_B, action_index, shares_held_A, shares_held_B, acct_bal);
+
+		# print('priceA = ', closing_price_A(state_A));
+		# print('priceB = ', closing_price_B(state_B));
+
+		# next_state_A = action_outcome['next_state_A']; 	print('nextA = ', next_state_A);
+		# next_state_B = action_outcome['next_state_B']; 	print('nextB = ', next_state_B);
+		# shares_held_A = action_outcome['shares_A']; 	print('sharesA = ', shares_held_A);
+		# shares_held_B = action_outcome['shares_B']; 	print('sharesB = ', shares_held_B);
+		# reward = action_outcome['reward']; 				print('reward = ', reward);
+		# acct_bal = action_outcome['bal']; 				print('account balance = ', acct_bal);
+
+
+		#
+		# Compute target weights
+		#
+
+		# next_state 	= one_hot_states(next_state_A, next_state_B);
+		# q_vals_next = q_network.predict(next_state.reshape(1,-1));
+		# target 		= reward + GAMMA * np.amax(q_vals_next[0]);
+
+
+		#
+		# Update target weight parameters for neural network
+		#
+
+		# q_vals = q_network.predict(state.reshape(1, -1));
+		# q_vals[0][action_index] = target;
+		# q_network.fit(state.reshape(1,-1), q_vals, epochs=1, verbose=0);
+
+
+		#
+		# Define terminal condition (e.g. ran out of money)
+		#
+
+		if acct_bal <= 0:
+			print('!!!!!! BANKRUPT !!!!!!!!');
+			break;
+
+
+		#
+		# Update Q-function
+		#
+
+		# state_A, state_B = next_state_A, next_state_B;
+		# print('Q VALUES\n', q_vals);
+
+		print('-------------');
+		print('\n');
