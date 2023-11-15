@@ -26,8 +26,8 @@ from tensorflow.keras.optimizers import Adam;
 # Define params/hyperparams for RL Agent
 #
 
-EPISODES = 100;
-DAYS_PER_EPISODE = 10;
+EPISODE_COUNT 		= 150;
+DAYS_PER_EPISODE 	= 10;
 
 ALPHA = .10;
 GAMMA = .995;
@@ -133,13 +133,24 @@ end_date 	= datetime.today();
 # [1256 rows x 6 columns]
 
 
-# Valid intervals: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
-dd = yf.download('DD', start=start_date, end=end_date, interval='1d');
-ibm = yf.download('IBM', start=start_date, end=end_date, interval='1d');
-jpm = yf.download('JPM', start=start_date, end=end_date, interval='1d');
-ko = yf.download('KO', start=start_date, end=end_date, interval='1d');
-vz = yf.download('VZ', start=start_date, end=end_date, interval='1d');
-xom = yf.download('XOM', start=start_date, end=end_date, interval='1d');
+#
+#  These commands download data for Yahoo Finance.
+# To avoid making excessive calls to the yfinance API, we save them locally as CSVs and load them.
+#
+
+# dd = yf.download('DD', start=start_date, end=end_date, interval='1d');
+# ibm = yf.download('IBM', start=start_date, end=end_date, interval='1d');
+# jpm = yf.download('JPM', start=start_date, end=end_date, interval='1d');
+# ko = yf.download('KO', start=start_date, end=end_date, interval='1d');
+# vz = yf.download('VZ', start=start_date, end=end_date, interval='1d');
+# xom = yf.download('XOM', start=start_date, end=end_date, interval='1d');
+
+dd 	= pd.read_csv('dd.csv');
+ibm = pd.read_csv('ibm.csv');
+jpm = pd.read_csv('jpm.csv');
+ko 	= pd.read_csv('ko.csv');
+vz 	= pd.read_csv('vz.csv');
+xom = pd.read_csv('xom.csv');
 
 stock_data = pd.DataFrame({
 	'DD' : dd['Close'],
@@ -184,28 +195,37 @@ stock_data = pd.DataFrame({
 # EVZCLS: CBOE EuroCurrency ETF Volatility Index
 
 volatility_basket = ['VIXCLS', 'OVXCLS', 'GVZCLS', 'RVXCLS', 'VXNCLS', 'EVZCLS']
+volatility_data = pd.read_csv("fred_volatility_data.csv", index_col=0);
 
-vix = fred.get_series('VIXCLS');
-ovx = fred.get_series('OVXCLS');
-gvz = fred.get_series('GVZCLS');
-rvx = fred.get_series('RVXCLS');
-vxn = fred.get_series('VXNCLS');
-evz = fred.get_series('EVZCLS');
+# vix = fred.get_series('VIXCLS');
+# ovx = fred.get_series('OVXCLS');
+# gvz = fred.get_series('GVZCLS');
+# rvx = fred.get_series('RVXCLS');
+# vxn = fred.get_series('VXNCLS');
+# evz = fred.get_series('EVZCLS');
 
 
-volatility_data = pd.DataFrame({
-	'VIX': vix,
-	'OVX': ovx,
-	'GVZ': gvz,
-	'RVX': rvx,
-	'VXN': vxn,
-	'EVZ': evz
-});
+# volatility_data = pd.DataFrame({
+# 	'VIX': vix,
+# 	'OVX': ovx,
+# 	'GVZ': gvz,
+# 	'RVX': rvx,
+# 	'VXN': vxn,
+# 	'EVZ': evz
+# });
 
 # The Gold ETF Volatility Index started most recently (2008-06-03).
 # Filter out rows whose date precedes June 03, 2008.
 
-volatility_data = volatility_data[volatility_data.index >= pd.to_datetime('2008-06-03')];
+# volatility_data = volatility_data[volatility_data.index >= pd.to_datetime('2008-06-03')];
+
+
+
+
+
+#
+# Read the volatility_data dataframe from a local CSV to avoid excessive API calls to FRED
+#
 
 # 2. For each column in stock_data, construct a SVM-vix model:
 # 	• Create a new dataframe with one column for a single stock's daily closing price and the other columns filled with volatility data
@@ -274,8 +294,8 @@ volatility_data = volatility_data[volatility_data.index >= pd.to_datetime('2008-
 # TO DO: ENSURE THAT EACH OF THE BELOW FRED DATAFRAMES CONTAIN DAILY DATA (e.g. not weekly/monthly/quarterly)
 # 	• Fill in the inter-observation missing daily days values with preceding observation's value (simple but whatever)
 
-overall_market_ids = ['DJIA', 'DJTA', 'WILL5000IND']; 								# DJIA, DJTA start 2013-11-14
-macro_economic_ids = ['GDP', 'UMCSENT', 'CPIAUCSL', 'PPIACO', 'UNRATE', 'RSXFS']; 	# RSXFS starts 1992; need to adjust because some monthly basis, some quarterly basis.
+overall_market_ids 	= ['DJIA', 'DJTA', 'WILL5000IND']; 								# DJIA, DJTA start 2013-11-14
+macro_economic_ids 	= ['GDP', 'UMCSENT', 'CPIAUCSL', 'PPIACO', 'UNRATE', 'RSXFS']; 	# RSXFS starts 1992; need to adjust because some monthly basis, some quarterly basis.
 federal_reserve_ids = ['FEDFUNDS', 'WALCL', 'WRESBAL']; 							# WALCL starts 2002-12-18; freqs = [monthly, weekly, weekly]
 
 
@@ -338,7 +358,7 @@ def kelly_wager (prob_win, prob_loss, loss_frac, win_frac):
 
 
 def predict_stock_return (stock, stock_prices):
-	# PUT A PREDICTIVE MODEL OF STOCK PRICES HERE
+	# PUT A RIDGE REGRESSION PREDICTIVE MODEL OF STOCK PRICES HERE
 	return .05;
 
 
@@ -384,7 +404,7 @@ for ep in range(EPISODE_COUNT):
 	# state_A = ep * DAYS_PER_EPISODE % state_count_A;
 	# state_B = ep * DAYS_PER_EPISODE % state_count_B;
 
-	# acct_bal = ACCT_BAL_0;
+	acct_bal = ACCT_BAL_0;
 
 	# shares_held_A = 0;
 	# shares_held_B = 0;
