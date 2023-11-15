@@ -1,12 +1,11 @@
 import os, dotenv;
 import numpy as np;
 import pandas as pd;
+from datetime import datetime, timedelta;
 
 # Packages for RIDGE Regression
 from sklearn.linear_model import Ridge, RidgeCV;
 from sklearn.model_selection import RepeatedKFold;
-
-from datetime import datetime, timedelta;
 
 # Packages for data acquisition
 import yfinance as yf;
@@ -35,7 +34,6 @@ EPSILON = .05;
 
 ACCT_BAL_0 = 1000;
 
-
 SHARES_PER_TRADE = 10;
 
 
@@ -59,54 +57,17 @@ fred = Fred(api_key = fred_api_key);
 
 
 #
-# Instantiate Tradier
+# Instantiate Tradier Account and EquityOrder.
 #
 
-# >>> uva_account.get_account_balance().T
-# option_short_value                   0
-# total_equity                 262571.53
-# account_number              VA36593574
-# account_type                    margin
-# close_pl                             0
-# current_requirement            16214.1
-# equity                               0
-# long_market_value              32110.2
-# market_value                   32110.2
-# open_pl                       -6755.37
-# option_long_value                    0
-# option_requirement                   0
-# pending_orders_count                 0
-# short_market_value                   0
-# stock_long_value               32110.2
-# total_cash                   230461.33
-# uncleared_funds                      0
-# pending_cash                         0
-# margin.fed_call                      0
-# margin.maintenance_call              0
-# margin.option_buying_power    246652.8
-# margin.stock_buying_power     493305.6
-# margin.stock_short_value             0
-# margin.sweep                         0
-
-# >>> uva_equity_order.order(symbol='DD', side='buy', quantity=5, order_type='market')
-# {'order': {'id': 9163724, 'status': 'ok', 'partner_id': '3a8bbee1-5184-4ffe-8a0c-294fbad1aee9'}}
-
-uva_account = Account(tradier_acct, tradier_token);
-uva_equity_order = EquityOrder(tradier_acct, tradier_token);
+account 		= Account(tradier_acct, tradier_token);
+equity_order 	= EquityOrder(tradier_acct, tradier_token);
 
 
 
 #
 # Fetch historic stock data for universe of discourse
 #
-
-blue_chip_stocks = [
-	'AA', 'ABBV', 'AXP', 'BA', 'BAC', 'C',
-	'CAT', 'CI', 'CVX', 'DD', 'DIS', 'GE',
-	'GM', 'HD', 'HPQ', 'IBM', 'JNJ', 'JPM',
-	'KO', 'MCD', 'MMM', 'MRK', 'PFE', 'PG',
-	'T', 'VZ', 'WMT', 'XOM'
-];
 
 
 stock_basket = ['DD', 'IBM', 'JPM', 'KO', 'VZ', 'XOM'];
@@ -194,9 +155,6 @@ stock_data = pd.DataFrame({
 # VXNCLS: CBOE NASDAQ 100 Volatility Index
 # EVZCLS: CBOE EuroCurrency ETF Volatility Index
 
-volatility_basket = ['VIXCLS', 'OVXCLS', 'GVZCLS', 'RVXCLS', 'VXNCLS', 'EVZCLS']
-volatility_data = pd.read_csv("fred_volatility_data.csv", index_col=0);
-
 # vix = fred.get_series('VIXCLS');
 # ovx = fred.get_series('OVXCLS');
 # gvz = fred.get_series('GVZCLS');
@@ -219,13 +177,9 @@ volatility_data = pd.read_csv("fred_volatility_data.csv", index_col=0);
 
 # volatility_data = volatility_data[volatility_data.index >= pd.to_datetime('2008-06-03')];
 
-
-
-
-
-#
 # Read the volatility_data dataframe from a local CSV to avoid excessive API calls to FRED
-#
+volatility_basket 	= ['VIXCLS', 'OVXCLS', 'GVZCLS', 'RVXCLS', 'VXNCLS', 'EVZCLS']
+volatility_data 	= pd.read_csv("fred_volatility_data.csv", index_col=0);
 
 # 2. For each column in stock_data, construct a SVM-vix model:
 # 	• Create a new dataframe with one column for a single stock's daily closing price and the other columns filled with volatility data
@@ -305,7 +259,6 @@ federal_reserve_ids = ['FEDFUNDS', 'WALCL', 'WRESBAL']; 							# WALCL starts 20
 # 	• Maybe something here about cross-validation
 
 # 3. Fit a RIDGE regression model to the training data
-
 
 # 4. Stick the testing dataset's covariates into the RIDGE model to assess its performance.
 # 	• If (model is trash) -> get a new set of predictor variables and try again until it is nice
