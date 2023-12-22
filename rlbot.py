@@ -10,6 +10,7 @@ from sklearn.model_selection import RepeatedKFold;
 # Packages for data acquisition
 import yfinance as yf;
 from fredapi import Fred;
+import quandl;
 
 # Execute paper trade orders on Tradier brokerage platform
 # https://pypi.org/project/uvatradier/
@@ -47,6 +48,9 @@ fred_api_key = os.getenv('fred_api_key');
 
 tradier_acct = os.getenv('tradier_acct');
 tradier_token = os.getenv('tradier_token');
+
+
+quandl_api_key = os.getenv('quandl_api_key');
 
 
 #
