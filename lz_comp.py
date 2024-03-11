@@ -56,6 +56,19 @@ print(f'Compression Ratio: {len(df_binary)/len(df_compress)}');
 
 
 
+#
+# Apply to several different stocks and compare compression ratios
+#
+
+stocks = ['APA', 'ANET', 'CF', 'CHRW', 'CDW', 'KO', 'CAG', 'XRAY', 'DXCM'];
+for x in stocks:
+	df = yf.Ticker(x).history(period='5mo');
+	df_binary = binarize(df['Close']);
+	df_compress = lz_compression(df_binary);
+	print(f"Compression Ratio [{x}]: \t{np.round(len(df_binary)/len(df_compress),4)}");
+
+
+
 
 
 
