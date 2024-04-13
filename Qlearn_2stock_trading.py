@@ -1,3 +1,17 @@
+#
+# NOTES:
+# • Simulates two stocks as sinusoids with added noise
+# • State Space: Combinations of the two stock prices within the range
+# • Action Space: {'buy', 'sell'} <---- would be nice to add 'hold' as an action
+# • Reward: Stock returns from the financial transactions
+# • Training Algorithm:
+# 	• Q-learning for off-policy control, e.g. to learn the optimal actions (buy/sell) price points of the combinations of stocks
+# 	• Update rule: TD(0) to estimate Q_\pi
+#
+#
+
+
+
 import time; start_time = time.perf_counter();
 
 import os, dotenv;
@@ -36,6 +50,11 @@ action_count_A = 3;
 action_count_B = 3;
 
 action_count = action_count_A * action_count_B;
+
+
+#
+# Initialize state-action space
+#
 
 Q = np.zeros((state_count_A, state_count_B, action_count));
 
