@@ -5,17 +5,24 @@ import pandas as pd;
 import numpy as np;
 import matplotlib.pyplot as plt;
 import datetime;
+import re;
 
 from scipy.optimize import minimize;
 import scipy.stats as stats;
 
 import yfinance as yf;
-from uvatradier import Account, Quotes;
+from uvatradier import Account, Quotes, OptionsData, EquityOrder, OptionsOrder;
 
 dotenv.load_dotenv();
 
 tradier_acct = os.getenv('tradier_acct');
 tradier_token = os.getenv('tradier_token');
+
+acct = Account(tradier_acct, tradier_token);
+quotes = Quotes(tradier_acct, tradier_token);
+equity_order = EquityOrder(tradier_acct, tradier_token);
+options_data = OptionsData(tradier_acct, tradier_token);
+options_order = OptionsOrder(tradier_acct, tradier_token);
 
 print(f'acct: {tradier_acct}');
 print(f'token: {tradier_token}');
