@@ -28,8 +28,6 @@ def sell_shares():
     print(acct.get_positions());
     print(response)
 
-
-
 tradier_acct = os.getenv('tradier_acct');
 tradier_token = os.getenv('tradier_token');
 
