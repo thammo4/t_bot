@@ -1,6 +1,7 @@
 import os;
 import dotenv;
 import random;
+import requests;
 import warnings;
 import pandas as pd;
 import numpy as np;
@@ -25,6 +26,10 @@ random.seed(10);
 
 tradier_acct = os.getenv('tradier_acct');
 tradier_token = os.getenv('tradier_token');
+
+tradier_acct_live = os.getenv('tradier_acct_live');
+tradier_token_live = os.getenv('tradier_token_live');
+
 fred_api_key = os.getenv('fred_api_key');
 
 acct = Account(tradier_acct, tradier_token);
