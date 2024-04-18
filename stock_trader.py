@@ -1,3 +1,4 @@
+# For yfinance interval: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo
 import os;
 import dotenv;
 import random;
@@ -39,6 +40,39 @@ options_data = OptionsData(tradier_acct, tradier_token);
 options_order = OptionsOrder(tradier_acct, tradier_token);
 
 fred = Fred(api_key=fred_api_key);
+
+
+#
+# Feature-engineering function to define random variables for analysis
+#
+
+def create_features (df):
+	# Price-related features
+	df['LogReturns'] = np.log(df['Close']/df['Close'].shift(1));
+	df['PriceChange'] = df['Close'].diff();
+	df['PercentChange'] = df['Close'].pct_change();
+	df['IsPriceIncrease'] = (df['Close'].shift(-1) > df['Close']).astype(int);
+
+	# Volatility-related features
+	df['Volatility'] = df['Close'].std();
+	df['VolatilityNormalized'] = df['Volatility']/df['Close'].mean();
+	df['VolatilityRolling'] = df['Close'].rolling(window=6).std();
+
+	df = df.dropna();
+
+	return df;
+
+#
+# Make OHLCV bar data bitemporal with ValidFrom/ValidTo
+#
+
+def make_bitemporal (df):
+	df['ValidFrom'] = pd.to_datetime(df.index);
+	df['ValidTo'] = df['ValidFrom'].shift(-1);
+	df.iloc[-1, df.columns.get_loc('ValidTo')] = pd.Timestamp(str(datetime.datetime.now()));
+
+	return df;
+
 
 
 # random sample basket of symbols to begin, constructed via random.sample(DOW30, 5)
@@ -89,35 +123,53 @@ risk_free_rate = fred.get_series_latest_release('DTB3').iloc[-1];
 # Create feature dataframe - Price Changes, Volatility, Price Increase/Decrease
 #
 
-# EXAMPLE OUTPUT
-#
 # >>> df_features
-#            Open        High         Low       Close  Volume  Dividends  Stock Splits  PriceChange  PercentChange  Volatility  RollingVolatility  IsPriceIncrease Symbol
-# 0    183.440002  184.259995  183.389999  183.884995  867343        0.0           0.0     0.439987       0.002398    0.373084           0.377521                1   AMZN
-# 1    183.880005  184.170197  183.789993  183.949997  465566        0.0           0.0     0.065002       0.000353    0.373084           0.430396                1   AMZN
-# 2    183.949997  184.169998  183.529999  184.130005  453791        0.0           0.0     0.180008       0.000979    0.373084           0.495784                1   AMZN
-# 3    184.141296  184.279999  183.880005  184.235001  535816        0.0           0.0     0.104996       0.000570    0.373084           0.446945                1   AMZN
-# 4    184.229996  184.660004  184.229996  184.604996  716329        0.0           0.0     0.369995       0.002008    0.373084           0.387679                0   AMZN
-# ..          ...         ...         ...         ...     ...        ...           ...          ...            ...         ...                ...              ...    ...
-# 355  272.700012  272.700012  271.739990  271.809998   34015        0.0           0.0    -0.929993      -0.003410    0.467535           0.418317                1      V
-# 356  271.704987  272.079987  271.589996  271.970001   30573        0.0           0.0     0.160004       0.000589    0.467535           0.462803                0      V
-# 357  272.013000  272.013000  271.579987  271.910004   47791        0.0           0.0    -0.059998      -0.000221    0.467535           0.462624                1      V
-# 358  271.950012  272.329987  271.920105  272.290009   42213        0.0           0.0     0.380005       0.001398    0.467535           0.424184                1      V
-# 359  272.350006  272.630005  272.170013  272.309998   75365        0.0           0.0     0.019989       0.000073    0.467535           0.345275                0      V
+#            Open        High         Low       Close  Volume  ...  VolatilityNormalized  VolatilityRolling                 ValidFrom                    ValidTo  Symbol
+# 0    183.830002  183.940002  183.490204  183.675003  423050  ...              0.006042           0.286561 2024-04-17 09:55:00-04:00  2024-04-17 10:00:00-04:00    AMZN
+# 1    183.690002  183.789993  183.332397  183.449997  415565  ...              0.006042           0.343334 2024-04-17 10:00:00-04:00  2024-04-17 10:05:00-04:00    AMZN
+# 2    183.455002  183.854996  183.455002  183.695007  327193  ...              0.006042           0.307909 2024-04-17 10:05:00-04:00  2024-04-17 10:10:00-04:00    AMZN
+# 3    183.695007  183.759995  183.339996  183.539993  331583  ...              0.006042           0.187451 2024-04-17 10:10:00-04:00  2024-04-17 10:15:00-04:00    AMZN
+# 4    183.529999  183.589996  183.360001  183.399994  254919  ...              0.006042           0.166346 2024-04-17 10:15:00-04:00  2024-04-17 10:20:00-04:00    AMZN
+# ..          ...         ...         ...         ...     ...  ...                   ...                ...                       ...                        ...     ...
+# 355  272.589996  272.850006  272.528198  272.779999   31460  ...              0.001829           0.232457 2024-04-17 15:30:00-04:00  2024-04-17 15:35:00-04:00       V
+# 356  272.730011  272.760010  272.209991  272.290009   38812  ...              0.001829           0.248567 2024-04-17 15:35:00-04:00  2024-04-17 15:40:00-04:00       V
+# 357  272.309998  272.894989  272.260010  272.779999   49877  ...              0.001829           0.184507 2024-04-17 15:40:00-04:00  2024-04-17 15:45:00-04:00       V
+# 358  272.725006  273.100006  272.679993  273.054993   68019  ...              0.001829           0.253919 2024-04-17 15:45:00-04:00  2024-04-17 15:50:00-04:00       V
+# 359  273.059998  273.230011  272.760010  273.179993  143960  ...              0.001829           0.316608 2024-04-17 15:50:00-04:00  2024-04-17 15:55:00-04:00       V
 #
-# [360 rows x 13 columns]
+# [360 rows x 17 columns]
+#
+#
+# >>> df_features.T
+#                                             0                          1    ...                        358                        359
+# Open                                 183.830002                 183.690002  ...                 272.725006                 273.059998
+# High                                 183.940002                 183.789993  ...                 273.100006                 273.230011
+# Low                                  183.490204                 183.332397  ...                 272.679993                  272.76001
+# Close                                183.675003                 183.449997  ...                 273.054993                 273.179993
+# Volume                                   423050                     415565  ...                      68019                     143960
+# Dividends                                   0.0                        0.0  ...                        0.0                        0.0
+# Stock Splits                                0.0                        0.0  ...                        0.0                        0.0
+# LogReturns                            -0.000898                  -0.001226  ...                   0.001008                   0.000458
+# PriceChange                           -0.164993                  -0.225006  ...                   0.274994                      0.125
+# PercentChange                         -0.000897                  -0.001225  ...                   0.001008                   0.000458
+# IsPriceIncrease                               0                          1  ...                          1                          0
+# Volatility                             1.099571                   1.099571  ...                   0.498631                   0.498631
+# VolatilityNormalized                   0.006042                   0.006042  ...                   0.001829                   0.001829
+# VolatilityRolling                      0.286561                   0.343334  ...                   0.253919                   0.316608
+# ValidFrom             2024-04-17 09:55:00-04:00  2024-04-17 10:00:00-04:00  ...  2024-04-17 15:45:00-04:00  2024-04-17 15:50:00-04:00
+# ValidTo               2024-04-17 10:00:00-04:00  2024-04-17 10:05:00-04:00  ...  2024-04-17 15:50:00-04:00  2024-04-17 15:55:00-04:00
+# Symbol                                     AMZN                       AMZN  ...                          V                          V
+#
+# [17 rows x 360 columns]
+
+
 
 data = {ticker: yf.Ticker(ticker).history(period='1d', interval='5m') for ticker in dow_sample};
 features = pd.DataFrame();
 
 for symbol, df in data.items():
-	df['PriceChange'] = df['Close'].diff();
-	df['PercentChange'] = df['Close'].pct_change();
-	df['Volatility'] = df['Close'].std();
-	df['RollingVolatility'] = df['Close'].rolling(window=6).std();
-	# df['IsPriceIncrease'] = (df['Close'] > df['Open']).astype(int);
-	df['IsPriceIncrease'] = (df['Close'].shift(-1) > df['Close']).astype(int);
-	df = df.dropna();
+	df = create_features(df);
+	df = make_bitemporal(df);
 
 	df['Symbol'] = symbol;
 	features = pd.concat([features, df], axis=0);
