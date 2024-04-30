@@ -1,3 +1,4 @@
+# FILE NAME: `tradier_stream_connect.py`
 import os;
 import dotenv;
 import random;
@@ -29,10 +30,11 @@ def tradier_http_stream():
 			stream_url = session_info['url'];
 			stream_session_id = session_info['sessionid'];
 
-			print(f'Connecting to stream {stream_url} with session ID {stream_session_id}');
+			print(f'Connecting to stream {stream_url} with session ID\n{stream_session_id}\n\n');
 			time.sleep(240);
 		else:
 			print("Get f#%$^d");
+
 
 #
 # Initialize thread to handle streaming session
